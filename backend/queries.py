@@ -170,13 +170,21 @@ def run_triage_demographic_rollup():
 def execute_user_sql(query_str: str):
     """
     Executes ad-hoc read-only SQL query on the DuckDB instance with execution timing.
+    Supports queries containing single-line (--) and block (/* */) SQL comments.
     """
+    import re
     conn = get_connection()
     start = time.perf_counter()
     try:
-        q_clean = query_str.strip().upper()
-        if not (q_clean.startswith("SELECT") or q_clean.startswith("WITH") or q_clean.startswith("DESCRIBE") or q_clean.startswith("PRAGMA") or q_clean.startswith("SHOW")):
-            raise ValueError("Only analytical read-only queries (SELECT, WITH, DESCRIBE, SHOW, PRAGMA) are permitted in this console.")
+        # Strip comments for validation
+        no_single = re.sub(r'--[^\n]*', '', query_str)
+        no_multi = re.sub(r'/\*.*?\*/', '', no_single, flags=re.DOTALL)
+        clean_upper = no_multi.strip().upper()
+
+        if not (clean_upper.startswith("SELECT") or clean_upper.startswith("WITH") or 
+                clean_upper.startswith("DESCRIBE") or clean_upper.startswith("PRAGMA") or 
+                clean_upper.startswith("SHOW") or clean_upper.startswith("EXPLAIN")):
+            raise ValueError("Only analytical read-only queries (SELECT, WITH, DESCRIBE, SHOW, PRAGMA, EXPLAIN) are permitted in this console.")
         
         cursor = conn.execute(query_str)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
