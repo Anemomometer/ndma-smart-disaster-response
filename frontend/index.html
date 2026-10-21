@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NDMA Smart Disaster Response Coordination System</title>
+  <meta name="description" content="Advanced Disaster Response Coordination Command Center powered by DuckDB Vectorized Columnar Engine">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="command-dark">
+  <!-- Top Emergency Ticker -->
+  <aside class="alert-ticker" aria-label="Live Emergency Ticker">
+    <div class="ticker-badge"><span class="pulse-dot"></span> LIVE TELEMETRY</div>
+    <div class="ticker-content" id="liveTickerText">
+      FLASH ALERT: Cyclone "Vajra" wind speeds at 175.5 km/h along Puri Seaboard // IoT Sensor SNS-OD-FL-01 water level threshold exceeded (4.8m / 4.5m) // Dahej Industrial HAZMAT containment underway // All 8 NDRF battalions on active mobilization.
+    </div>
+    <div class="ticker-engine">
+      <span class="db-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> DuckDB 2.0 OLAP Vector Engine</span>
+    </div>
+  </aside>
+
+  <!-- Main Tactical Navigation Header -->
+  <header class="tactical-header">
+    <div class="header-branding">
+      <div class="emblem-container">
+        <div class="tactical-shield">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+        </div>
+        <div class="radar-ping"></div>
+      </div>
+      <div class="brand-titles">
+        <div class="org-subtitle">NATIONAL DISASTER MANAGEMENT AUTHORITY • COMMAND CORE</div>
+        <h1 class="main-title">Smart Disaster Response Coordination System</h1>
+      </div>
+    </div>
+
+    <!-- Live System Clocks & Actions -->
+    <div class="header-actions">
+      <div class="tactical-clock">
+        <span class="clock-label">OPERATIONAL TIME (IST)</span>
+        <span class="clock-val" id="istClock">--:--:--</span>
+      </div>
+      <button class="btn btn-danger glow-pulse" id="btnDeclareDisaster" onclick="openModal('modalDisaster')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+        Declare Disaster
+      </button>
+      <button class="btn btn-cyan" id="btnSimulateTelemetry" onclick="triggerSensorSimulation()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Simulate IoT Surge
+      </button>
+    </div>
+  </header>
+
+  <!-- Tactical Navigation Tabs -->
+  <nav class="tactical-nav">
+    <button class="nav-tab active" data-tab="tab-map">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      GIS Command Map
+    </button>
+    <button class="nav-tab" data-tab="tab-disasters">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Disaster Incidents
+      <span class="tab-pill" id="badgeDisasters">0</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-rescue">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Rescue Operations
+      <span class="tab-pill" id="badgeRescue">0</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-camps">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+      Relief Camps & Logistics
+      <span class="tab-pill" id="badgeCamps">0</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-sensors">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 4.97-3.63 9.09-8.34 9.87M12 6a6 6 0 0 1 6 6c0 2.98-2.18 5.46-5 5.92M12 10a2 2 0 0 1 2 2"/></svg>
+      IoT Telemetry Stream
+      <span class="tab-pill alert" id="badgeAlerts">0</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-analytics">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6 9l4 4 4-4 6 6"/><circle cx="6" cy="9" r="1"/><circle cx="10" cy="13" r="1"/><circle cx="14" cy="9" r="1"/><circle cx="20" cy="15" r="1"/></svg>
+      DuckDB SQL Analytics
+    </button>
+    <button class="nav-tab" data-tab="tab-tables">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Relational Tables (17)
+      <span class="tab-pill" id="badgeTables">17</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-demo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/></svg>
+      Demonstration Video
+      <span class="tab-pill" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">HD</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-academic">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      ER / EER & 3NF Report
+    </button>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="tactical-body">
+    <!-- Top KPI Grid -->
+    <section class="kpi-banner">
+      <div class="kpi-card danger-glow">
+        <div class="kpi-icon-wrap danger"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg></div>
+        <div class="kpi-data">
+          <div class="kpi-num" id="kpiActiveDisasters">-</div>
+          <div class="kpi-title">Active Disasters</div>
+          <div class="kpi-sub">Critical Crisis Zones</div>
+        </div>
+      </div>
+      <div class="kpi-card cyan-glow">
+        <div class="kpi-icon-wrap cyan"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div>
+        <div class="kpi-data">
+          <div class="kpi-num" id="kpiTotalEvacuees">-</div>
+          <div class="kpi-title">Rescued Individuals</div>
+          <div class="kpi-sub">Triage Registered</div>
+        </div>
+      </div>
+      <div class="kpi-card emerald-glow">
+        <div class="kpi-icon-wrap emerald"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="kpi-data">
+          <div class="kpi-num" id="kpiDeployedTeams">-</div>
+          <div class="kpi-title">Deployed Battalions</div>
+          <div class="kpi-sub">NDRF / SDRF In-Field</div>
+        </div>
+      </div>
+      <div class="kpi-card amber-glow">
+        <div class="kpi-icon-wrap amber"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
+        <div class="kpi-data">
+          <div class="kpi-num" id="kpiCampOccupancy">-</div>
+          <div class="kpi-title">Camp Capacity Status</div>
+          <div class="kpi-sub" id="kpiCampSub">-- / -- beds occupied</div>
+        </div>
+      </div>
+      <div class="kpi-card purple-glow">
+        <div class="kpi-icon-wrap purple"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 4.97-3.63 9.09-8.34 9.87M12 6a6 6 0 0 1 6 6c0 2.98-2.18 5.46-5 5.92M12 10a2 2 0 0 1 2 2"/></svg></div>
+        <div class="kpi-data">
+          <div class="kpi-num" id="kpiActiveAlerts">-</div>
+          <div class="kpi-title">Critical Sensor Alerts</div>
+          <div class="kpi-sub">Threshold Breaches</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 1: GIS COMMAND MAP -->
+    <section class="tab-pane active" id="tab-map">
+      <div class="map-layout">
+        <!-- Interactive Leaflet Map -->
+        <div class="map-container-wrap">
+          <div class="map-overlay-controls">
+            <span class="map-legend-item"><span class="legend-color legend-red"></span> Disaster Epicenter</span>
+            <span class="map-legend-item"><span class="legend-color legend-green"></span> Relief Camp</span>
+            <span class="map-legend-item"><span class="legend-color legend-cyan"></span> IoT Sensor Station</span>
+          </div>
+          <div id="gisMap" class="tactical-map"></div>
+        </div>
+
+        <!-- Right Side Tactical Stream -->
+        <div class="map-sidebar">
+          <div class="panel-header">
+            <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> Active Situational Feed</h3>
+            <span class="badge badge-pulse">LIVE</span>
+          </div>
+          <div class="feed-list" id="quickDisasterFeed">
+            <!-- Populated via JS -->
+          </div>
+
+          <div class="panel-header mt-4">
+            <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Critical Sensor Telemetry</h3>
+          </div>
+          <div class="feed-list" id="quickSensorFeed">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: DISASTER INCIDENTS -->
+    <section class="tab-pane" id="tab-disasters">
+      <div class="table-card">
+        <div class="card-toolbar">
+          <div class="toolbar-title">
+            <h2>Active & Contained Disaster Incidents</h2>
+            <p>Monitored via NDMA GIS telemetry with 3NF specialization attributes</p>
+          </div>
+          <div class="toolbar-actions">
+            <select id="filterDisasterStatus" class="select-input" onchange="renderDisastersTable()">
+              <option value="">All Statuses</option>
+              <option value="Active">Active Only</option>
+              <option value="Contained">Contained</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+            <button class="btn btn-primary" onclick="openModal('modalDisaster')">+ Declare Incident</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="tactical-table" id="tableDisasters">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Disaster Name</th>
+                <th>Type / Subtype</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Coordinates & Radius</th>
+                <th>Affected Pop.</th>
+                <th>Teams</th>
+                <th>Evacuated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="disastersTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: RESCUE OPERATIONS -->
+    <section class="tab-pane" id="tab-rescue">
+      <div class="dual-grid">
+        <!-- Rescue Teams & Deployments -->
+        <div class="table-card">
+          <div class="card-toolbar">
+            <div class="toolbar-title">
+              <h2>Rescue Teams & Operational Deployments</h2>
+              <p>EER Aggregation: [Rescue Team + Disaster Event = Deployment]</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('modalDeployTeam')">Deploy Team</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tactical-table">
+              <thead>
+                <tr>
+                  <th>Team ID</th>
+                  <th>Team Name</th>
+                  <th>Agency</th>
+                  <th>Strength</th>
+                  <th>Vehicles</th>
+                  <th>Status</th>
+                  <th>Active Assignment</th>
+                </tr>
+              </thead>
+              <tbody id="teamsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Evacuee Triage Registry -->
+        <div class="table-card">
+          <div class="card-toolbar">
+            <div class="toolbar-title">
+              <h2>Rescued Individuals & Triage Registry</h2>
+              <p>Evacuee registration with camp capacity constraint enforcement</p>
+            </div>
+            <button class="btn btn-emerald" onclick="openModal('modalVictim')">+ Register Rescued Victim</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tactical-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Evacuee Name</th>
+                  <th>Age/Gender</th>
+                  <th>Triage Priority</th>
+                  <th>Allocated Camp</th>
+                  <th>Dependents</th>
+                  <th>Medical Notes</th>
+                </tr>
+              </thead>
+              <tbody id="victimsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: RELIEF CAMPS & LOGISTICS -->
+    <section class="tab-pane" id="tab-camps">
+      <div class="dual-grid">
+        <!-- Relief Camps Utilization -->
+        <div class="table-card">
+          <div class="card-toolbar">
+            <div class="toolbar-title">
+              <h2>Relief Camps & Capacity Management</h2>
+              <p>Live occupancy monitoring and bed vacancy verification</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('modalCamp')">+ Add Camp</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tactical-table">
+              <thead>
+                <tr>
+                  <th>Camp ID</th>
+                  <th>Facility Name</th>
+                  <th>In-Charge</th>
+                  <th>Capacity Utilization</th>
+                  <th>Available Beds</th>
+                  <th>Medical Hub</th>
+                  <th>Risk Tier</th>
+                </tr>
+              </thead>
+              <tbody id="campsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Relief Supply Logistics -->
+        <div class="table-card">
+          <div class="card-toolbar">
+            <div class="toolbar-title">
+              <h2>Camp Inventory & Supply Burn-Rate</h2>
+              <p>DuckDB forecasted days of supply remaining</p>
+            </div>
+            <button class="btn btn-cyan" onclick="openModal('modalDispatch')">Dispatch Supplies</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tactical-table">
+              <thead>
+                <tr>
+                  <th>Camp</th>
+                  <th>Supplies Item</th>
+                  <th>Category</th>
+                  <th>In Stock</th>
+                  <th>Days Remaining</th>
+                  <th>Stock Health</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: IOT SENSORS & TELEMETRY -->
+    <section class="tab-pane" id="tab-sensors">
+      <div class="sensor-layout">
+        <div class="table-card sensor-table-card">
+          <div class="card-toolbar">
+            <div class="toolbar-title">
+              <h2>IoT Sensor Network & Early Warning Telemetry</h2>
+              <p>High-frequency time-series data captured in DuckDB columnar storage</p>
+            </div>
+            <button class="btn btn-cyan" onclick="triggerSensorSimulation()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Simulate Surge Influx
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="tactical-table">
+              <thead>
+                <tr>
+                  <th>Sensor ID</th>
+                  <th>Station / Location</th>
+                  <th>Sensor Type</th>
+                  <th>Threshold</th>
+                  <th>Latest Reading</th>
+                  <th>Battery</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="sensorsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Telemetry History & Live Chart -->
+        <div class="table-card chart-card">
+          <div class="card-toolbar">
+            <div class="toolbar-title">
+              <h2 id="chartTitle">Time-Series Telemetry Stream</h2>
+              <p id="chartSubtitle">Select a sensor to view historical sensor trends</p>
+            </div>
+            <span class="badge badge-info" id="chartSensorBadge">AQUASCAN-900</span>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="sensorTelemetryChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: DUCKDB SQL ANALYTICS -->
+    <section class="tab-pane" id="tab-analytics">
+      <div class="sql-console-grid">
+        <!-- Query Selector & Editor -->
+        <div class="sql-editor-card">
+          <div class="sql-header">
+            <div>
+              <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> DuckDB Vectorized SQL Console</h3>
+              <p>Execute sub-millisecond analytical aggregations directly on the in-process columnar database</p>
+            </div>
+            <div class="sql-actions">
+              <select id="presetQueriesSelect" class="select-input" onchange="loadPresetQuery()">
+                <option value="spatial">1. Haversine Spatial Nearest Camp Matrix (GIS)</option>
+                <option value="occupancy">2. Camp Occupancy Pressure & Evacuee Rollup</option>
+                <option value="window">3. IoT Sensor Moving Average & Outliers (Window Func)</option>
+                <option value="burn">4. Supply Burn Rate & Days to Exhaustion</option>
+                <option value="triage">5. Multi-Dimensional Casualty Triage Rollup</option>
+                <option value="assessments">6. Damage Loss vs Casualties by Disaster Type</option>
+              </select>
+              <button class="btn btn-primary" onclick="executeCurrentSQL()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run SQL
+              </button>
+            </div>
+          </div>
+          <div class="editor-area">
+            <textarea id="sqlQueryInput" rows="9" spellcheck="false"></textarea>
+          </div>
+          <div class="sql-footer">
+            <div class="sql-meta" id="sqlExecutionStatus">
+              Ready. Select or write a query and click Run SQL.
+            </div>
+            <div class="sql-tags">
+              <span class="tag">DuckDB 2.0.0</span>
+              <span class="tag">SIMD Vectorized</span>
+              <span class="tag">Columnar OLAP</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Query Results -->
+        <div class="sql-result-card">
+          <div class="result-header">
+            <h4>Query Result Set</h4>
+            <span class="badge badge-emerald" id="sqlTimeBadge">⚡ 0.0 ms</span>
+          </div>
+          <div class="table-responsive sql-table-wrap">
+            <table class="tactical-table sql-result-table" id="sqlResultTable">
+              <thead id="sqlResultHead"></thead>
+              <tbody id="sqlResultBody">
+                <tr><td class="text-muted" style="text-align: center; padding: 2rem;">Run a query to view execution output and schema projection.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 7: ACADEMIC DBMS REPORT & EER DIAGRAMS -->
+    <section class="tab-pane" id="tab-academic">
+      <div class="academic-doc-card">
+        <div class="academic-header">
+          <div>
+            <span class="badge badge-primary">PROBLEM STATEMENT #7</span>
+            <h2>Smart Disaster Response Coordination System: DBMS Specification</h2>
+            <p>Comprehensive ER/EER Conceptual Design, Relational Schemas, and 3NF Normalization Proofs</p>
+          </div>
+          <a href="/static/ACADEMIC_REPORT.md" target="_blank" class="btn btn-outline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Academic Report
+          </a>
+        </div>
+
+        <div class="academic-sections">
+          <!-- Section 1: Entities & Keys -->
+          <article class="doc-section">
+            <h3>1. Identified Entities, Primary Keys & Candidate Keys</h3>
+            <div class="table-responsive">
+              <table class="tactical-table">
+                <thead>
+                  <tr>
+                    <th>Entity</th>
+                    <th>Classification</th>
+                    <th>Primary Key (PK)</th>
+                    <th>Candidate Keys</th>
+                    <th>Foreign Keys (FK)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Disaster_Event</strong></td>
+                    <td>Superclass Entity</td>
+                    <td><code>disaster_id</code></td>
+                    <td><code>(name, start_time, latitude, longitude)</code></td>
+                    <td>None</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Natural_Disaster</strong></td>
+                    <td>Subclass Entity</td>
+                    <td><code>disaster_id</code></td>
+                    <td><code>disaster_id</code></td>
+                    <td><code>disaster_id -> Disaster_Event</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Technological_Disaster</strong></td>
+                    <td>Subclass Entity</td>
+                    <td><code>disaster_id</code></td>
+                    <td><code>disaster_id</code></td>
+                    <td><code>disaster_id -> Disaster_Event</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>IoT_Sensor</strong></td>
+                    <td>Strong Entity</td>
+                    <td><code>sensor_id</code></td>
+                    <td><code>(model_no, latitude, longitude)</code></td>
+                    <td>None</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Sensor_Telemetry</strong></td>
+                    <td>Weak Entity</td>
+                    <td><code>(sensor_id, recorded_at)</code></td>
+                    <td><code>(sensor_id, recorded_at)</code></td>
+                    <td><code>sensor_id -> IoT_Sensor</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Rescue_Team</strong></td>
+                    <td>Strong Entity</td>
+                    <td><code>team_id</code></td>
+                    <td><code>(agency_id, team_name)</code></td>
+                    <td><code>agency_id -> Agency</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Emergency_Vehicle</strong></td>
+                    <td>Strong Entity</td>
+                    <td><code>vehicle_id</code></td>
+                    <td><code>registration_no</code></td>
+                    <td><code>team_id -> Rescue_Team</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Relief_Camp</strong></td>
+                    <td>Strong Entity</td>
+                    <td><code>camp_id</code></td>
+                    <td><code>(camp_name, latitude, longitude)</code></td>
+                    <td>None</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Rescued_Individual</strong></td>
+                    <td>Strong Entity</td>
+                    <td><code>individual_id</code></td>
+                    <td><code>individual_id</code></td>
+                    <td><code>disaster_id, camp_id</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Dependent_Family_Member</strong></td>
+                    <td>Weak Entity</td>
+                    <td><code>(individual_id, dependent_seq)</code></td>
+                    <td><code>(individual_id, dependent_seq)</code></td>
+                    <td><code>individual_id -> Rescued_Individual</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Rescue_Deployment</strong></td>
+                    <td>Aggregation Entity</td>
+                    <td><code>deployment_id</code></td>
+                    <td><code>(disaster_id, team_id, dispatched_at)</code></td>
+                    <td><code>disaster_id, team_id</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Camp_Inventory</strong></td>
+                    <td>Associative Entity</td>
+                    <td><code>(camp_id, item_id)</code></td>
+                    <td><code>(camp_id, item_id)</code></td>
+                    <td><code>camp_id, item_id</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <!-- Section 2: Enhanced ER Concepts -->
+          <article class="doc-section">
+            <h3>2. Enhanced Entity-Relationship (EER) Concepts Applied</h3>
+            <div class="eer-cards-grid">
+              <div class="eer-concept-box">
+                <div class="eer-tag">Specialization / Generalization</div>
+                <h4>Disjoint Complete Hierarchy</h4>
+                <p><code>Disaster_Event</code> is specialized into <code>Natural_Disaster</code> (attributes: meteorological category, wind speed, seismic magnitude, flood depth) and <code>Technological_Disaster</code> (facility name, hazardous material type, containment status). Categorized with total disjoint constraints (a disaster is either natural or technological, never both).</p>
+              </div>
+
+              <div class="eer-concept-box">
+                <div class="eer-tag">Weak Entities</div>
+                <h4>Existence-Dependent Relations</h4>
+                <p>1. <code>Sensor_Telemetry</code> depends on <code>IoT_Sensor</code> (Partial Key: <code>recorded_at</code>).<br>2. <code>Dependent_Family_Member</code> depends on <code>Rescued_Individual</code> (Partial Key: <code>dependent_seq</code>). If the owner record is deleted, dependents and telemetry have no independent existence.</p>
+              </div>
+
+              <div class="eer-concept-box">
+                <div class="eer-tag">Aggregation</div>
+                <h4>Higher-Level Relationship Entity</h4>
+                <p>The relationship between <code>Rescue_Team</code> and <code>Disaster_Event</code> is aggregated into <code>Rescue_Deployment</code>. Resource allocations and logistical supply orders are directly linked to the specific deployment mission rather than floating in a ternary link.</p>
+              </div>
+
+              <div class="eer-concept-box">
+                <div class="eer-tag">Category / Union Type</div>
+                <h4>Polymorphic Relief Recipient</h4>
+                <p><code>Relief_Recipient = Relief_Camp ∪ Affected_Community</code>. Relief materials can be consigned to an institutional camp shelter or directly to an isolated village community via a unified foreign key abstraction.</p>
+              </div>
+            </div>
+          </article>
+
+          <!-- Section 3: Normalization Steps -->
+          <article class="doc-section">
+            <h3>3. Normalization from UNF to 3NF / BCNF</h3>
+            <div class="normalization-timeline">
+              <div class="norm-step">
+                <div class="norm-badge">UNF & Anomalies</div>
+                <div class="norm-body">
+                  <p>A single unnormalized <code>DISASTER_DISPATCH_RECORD</code> containing repeating groups of items, evacuees, and teams introduces severe <strong>Insertion Anomalies</strong> (cannot create camp without victims), <strong>Deletion Anomalies</strong> (discharging last victim deletes camp info), and <strong>Update Anomalies</strong> (redundant agency data).</p>
+                </div>
+              </div>
+
+              <div class="norm-step">
+                <div class="norm-badge">1NF (First Normal Form)</div>
+                <div class="norm-body">
+                  <p>All attributes are rendered strictly atomic. Multivalued fields (specialized equipment, distributed items) are decomposed into separate tuples. Primary keys are defined.</p>
+                </div>
+              </div>
+
+              <div class="norm-step">
+                <div class="norm-badge">2NF (Second Normal Form)</div>
+                <div class="norm-body">
+                  <p>Eliminated all <strong>Partial Functional Dependencies</strong> on composite candidate keys. For example, in <code>DISTRIBUTION(DisasterID, CampID, ItemID, DispatchDate, ItemName, Quantity)</code>, <code>ItemID -> ItemName</code> was partial and decomposed into <code>RELIEF_ITEM(ItemID, ItemName)</code>.</p>
+                </div>
+              </div>
+
+              <div class="norm-step">
+                <div class="norm-badge">3NF & BCNF</div>
+                <div class="norm-body">
+                  <p>Eliminated all <strong>Transitive Dependencies</strong>. In <code>RESCUE_TEAM(TeamID, TeamName, AgencyID, AgencyName)</code>, <code>TeamID -> AgencyID</code> and <code>AgencyID -> AgencyName</code> was transitive and decomposed into <code>AGENCIES</code> and <code>RESCUE_TEAMS</code>. Every determinant is a candidate key, achieving Boyce-Codd Normal Form (BCNF).</p>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Section 4: Database Technology Justification -->
+          <article class="doc-section">
+            <h3>4. Advanced Database Technology Justification: DuckDB</h3>
+            <div class="justification-box">
+              <ul>
+                <li><strong>Vectorized Columnar Analytical Engine:</strong> Disaster coordination is query-intensive; calculating camp occupancies, triage distributions, and rolling time-series alerts across thousands of sensor rows executes in sub-2 milliseconds via SIMD columnar execution.</li>
+                <li><strong>Network Partition & Offline Resilient:</strong> In catastrophic situations where external cellular and cloud datacenters are severed, DuckDB operates embedded in-process on mobile command units without heavy client-server daemons.</li>
+                <li><strong>Pure SQL GIS & Spatial Math:</strong> Directly computes spherical Haversine distances to match nearest available relief camps and dispatch rescue vehicles.</li>
+                <li><strong>Native ACID Reliability:</strong> Ensures zero orphaned records when registering evacuees, dispatching medicine, or allocating emergency beds.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: ALL RELATIONAL TABLES & SCHEMA EXPLORER -->
+    <section class="tab-pane" id="tab-tables">
+      <div class="tables-layout">
+        <!-- Left Sidebar: Table Selector -->
+        <div class="tables-sidebar">
+          <div class="panel-header">
+            <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Database Relations (17)</h3>
+            <span class="badge badge-info">3NF / BCNF</span>
+          </div>
+          <div class="tables-search-wrap">
+            <input type="text" id="tablesSearchInput" class="input-field" placeholder="Filter tables by name..." oninput="filterTablesList()">
+          </div>
+          <div class="tables-list-container" id="tablesListContainer">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <!-- Right Main: Selected Table Schema & Records -->
+        <div class="table-detail-panel">
+          <!-- Table Header Card -->
+          <div class="table-card mb-4" id="tableHeaderCard">
+            <div class="table-meta-header">
+              <div>
+                <div class="table-tag-row">
+                  <span class="badge badge-primary" id="tblEerTag">Superclass Entity</span>
+                  <span class="badge badge-emerald" id="tblNfTag">3NF / BCNF</span>
+                  <span class="badge badge-info" id="tblRowsBadge">6 Rows</span>
+                </div>
+                <h2 id="tblCurrentTitle" class="mt-2">disaster_events</h2>
+                <p id="tblCurrentDesc" class="text-muted">Core entity storing all natural and technological disaster events</p>
+              </div>
+              <div class="table-pk-box">
+                <span class="pk-label">PRIMARY KEY:</span>
+                <code id="tblPrimaryKey">disaster_id</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schema Columns Table -->
+          <div class="table-card mb-4">
+            <div class="card-toolbar">
+              <div class="toolbar-title">
+                <h3>Relational Schema Definition</h3>
+                <p>Attribute domain types, nullability constraints, and keys in DuckDB</p>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="tactical-table">
+                <thead>
+                  <tr>
+                    <th>Column Name</th>
+                    <th>Data Type</th>
+                    <th>Nullable?</th>
+                    <th>Key Constraint</th>
+                    <th>Default</th>
+                  </tr>
+                </thead>
+                <tbody id="tblSchemaBody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Live Table Data Records -->
+          <div class="table-card">
+            <div class="card-toolbar">
+              <div class="toolbar-title">
+                <h3>Live Tuples & Columnar Records</h3>
+                <p>Direct live data query from DuckDB in-process storage</p>
+              </div>
+              <div class="toolbar-actions">
+                <input type="text" id="recordSearchInput" class="input-field" placeholder="Search in records..." oninput="filterRecordRows()">
+                <button class="btn btn-outline" onclick="reloadCurrentTableRecords()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+              <table class="tactical-table" id="tblRecordsTable">
+                <thead id="tblRecordsHead"></thead>
+                <tbody id="tblRecordsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: DEMONSTRATION VIDEO & SYSTEM TOUR -->
+    <section class="tab-pane" id="tab-demo">
+      <div class="demo-layout">
+        <!-- Video Player Card -->
+        <div class="demo-player-card">
+          <div class="demo-player-header">
+            <div>
+              <span class="badge badge-emerald">RECORDED DEMONSTRATION & SYSTEM TOUR</span>
+              <h2>NDMA Smart Disaster Response Coordination System: Live Demonstration</h2>
+              <p>Full operational walkthrough featuring real-time GIS mapping, IoT telemetry stream, and DuckDB analytics</p>
+            </div>
+            <div class="demo-status-pill">
+              <span class="pulse-dot"></span> 1080p HD Video
+            </div>
+          </div>
+
+          <!-- Interactive Video Player Container -->
+          <div class="video-container" id="videoContainer">
+            <video id="demoVideoPlayer" controls autoplay loop muted playsinline poster="/static/demo_poster.png">
+              <source src="/static/demo_recording.webp" type="video/webp">
+              Your browser does not support the video tag.
+            </video>
+            <div class="video-overlay-banner">
+              <div class="video-chapter-badge" id="videoCurrentChapterBadge">Chapter 1: Tactical GIS Command Map & Severity Zones</div>
+            </div>
+          </div>
+
+          <!-- Video Playback Chapter Selector -->
+          <div class="demo-chapters-grid">
+            <button class="chapter-card active" onclick="seekDemoChapter(1, 'tab-map', 'Tactical GIS Command Map & Severity Zones')">
+              <div class="ch-time">0:00</div>
+              <div class="ch-info">
+                <div class="ch-title">1. GIS Crisis Command Map</div>
+                <div class="ch-desc">Live multi-layer mapping, disaster radius circles, camp markers</div>
+              </div>
+            </button>
+
+            <button class="chapter-card" onclick="seekDemoChapter(2, 'tab-disasters', 'Disaster Incident Management & Subclass Specialization')">
+              <div class="ch-time">0:15</div>
+              <div class="ch-info">
+                <div class="ch-title">2. Incident Specialization</div>
+                <div class="ch-desc">Natural vs Technological hazard attributes, declaration modal</div>
+              </div>
+            </button>
+
+            <button class="chapter-card" onclick="seekDemoChapter(3, 'tab-rescue', 'Rescue Battalion Deployment & Haversine Camp Allocation')">
+              <div class="ch-time">0:30</div>
+              <div class="ch-info">
+                <div class="ch-title">3. Rescue & Evacuation</div>
+                <div class="ch-desc">Battalion mobilization, triage registry, nearest camp check</div>
+              </div>
+            </button>
+
+            <button class="chapter-card" onclick="seekDemoChapter(4, 'tab-sensors', 'IoT Sensor Telemetry & Instant Surge Simulation')">
+              <div class="ch-time">0:45</div>
+              <div class="ch-info">
+                <div class="ch-title">4. IoT Telemetry Stream</div>
+                <div class="ch-desc">Live river/wind/gas telemetry, Chart.js time-series, surge trigger</div>
+              </div>
+            </button>
+
+            <button class="chapter-card" onclick="seekDemoChapter(5, 'tab-analytics', 'DuckDB Vectorized Columnar SQL Analytics')">
+              <div class="ch-time">1:00</div>
+              <div class="ch-info">
+                <div class="ch-title">5. DuckDB SQL Engine</div>
+                <div class="ch-desc">Window functions, pure SQL Haversine math, sub-2ms speed</div>
+              </div>
+            </button>
+
+            <button class="chapter-card" onclick="seekDemoChapter(6, 'tab-tables', '17 Relational Schema Tables Explorer')">
+              <div class="ch-time">1:15</div>
+              <div class="ch-info">
+                <div class="ch-title">6. 17 Relational Tables</div>
+                <div class="ch-desc">3NF schema attributes, foreign keys, live row inspection</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Guided Tour Actions -->
+        <div class="demo-actions-card">
+          <div class="panel-header">
+            <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Quick Interactive Demonstration Triggers</h3>
+          </div>
+          <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 12px;">Trigger live operations in the system with one click to test real-time reactivity:</p>
+          
+          <div class="demo-trigger-list">
+            <button class="btn btn-cyan btn-block" onclick="runInteractiveDemoStep('surge')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              1. Trigger IoT Telemetry Surge & Alert
+            </button>
+            <button class="btn btn-primary btn-block" onclick="runInteractiveDemoStep('spatial')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+              2. Run Pure SQL Haversine Nearest Camp Query
+            </button>
+            <button class="btn btn-emerald btn-block" onclick="runInteractiveDemoStep('inspect_tables')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              3. Inspect Rescued Individuals 3NF Table
+            </button>
+            <button class="btn btn-danger btn-block" onclick="openModal('modalDisaster')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              4. Open Declare Disaster Modal
+            </button>
+          </div>
+
+          <div class="demo-notes-box mt-4">
+            <h4>Technology Summary</h4>
+            <ul>
+              <li><strong>Database:</strong> DuckDB 2.0 (Vectorized SIMD Columnar)</li>
+              <li><strong>Schema:</strong> 17 Tables in 3NF / BCNF</li>
+              <li><strong>EER Concepts:</strong> Specialization, Weak Entities, Aggregation, Categories</li>
+              <li><strong>GIS Engine:</strong> Leaflet with Esri Dark Gray Base & Satellite</li>
+              <li><strong>Backend:</strong> FastAPI with in-process DuckDB connection</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Modal 1: Declare Disaster -->
+  <div class="tactical-modal" id="modalDisaster">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg> Declare Disaster Incident</h3>
+        <button class="modal-close" onclick="closeModal('modalDisaster')">&times;</button>
+      </div>
+      <form id="formDisaster" onsubmit="handleCreateDisaster(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Disaster Name</label>
+            <input type="text" id="disName" required placeholder="e.g. Cyclone Rudra Impact Zone" class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Disaster Type</label>
+            <select id="disType" class="input-field" required>
+              <option value="Cyclone">Cyclone</option>
+              <option value="Flood">Flood</option>
+              <option value="Landslide">Landslide</option>
+              <option value="Earthquake">Earthquake</option>
+              <option value="Wildfire">Wildfire</option>
+              <option value="Industrial Accident">Industrial Accident</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Severity Level (1-5)</label>
+            <input type="number" id="disSeverity" min="1" max="5" value="4" required class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Classification (EER Subclass)</label>
+            <select id="disClass" class="input-field" onchange="toggleDisasterSubclassFields()">
+              <option value="Natural">Natural Disaster</option>
+              <option value="Technological">Technological / Industrial</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Latitude</label>
+            <input type="number" step="0.0001" id="disLat" value="20.2961" required class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" step="0.0001" id="disLon" value="85.8245" required class="input-field">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Impact Radius (km)</label>
+            <input type="number" step="0.1" id="disRadius" value="75.0" required class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Estimated Affected Population</label>
+            <input type="number" id="disPop" value="50000" class="input-field">
+          </div>
+        </div>
+
+        <!-- Natural Subclass Fields -->
+        <div id="subclassNatural" class="subclass-box">
+          <div class="subclass-title">Natural Disaster Specific Attributes</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Wind Speed (km/h)</label>
+              <input type="number" step="0.1" id="disWind" value="150" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Flood Depth (m) / Seismic (Richter)</label>
+              <input type="number" step="0.1" id="disMetric" value="3.5" class="input-field">
+            </div>
+          </div>
+        </div>
+
+        <!-- Technological Subclass Fields -->
+        <div id="subclassTech" class="subclass-box" style="display: none;">
+          <div class="subclass-title">Technological Hazard Specific Attributes</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Facility Name</label>
+              <input type="text" id="disFacility" placeholder="e.g. Petrochemical Refinery Plant" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Hazardous Material</label>
+              <input type="text" id="disHazmat" placeholder="e.g. Chlorine Gas / Ammonia" class="input-field">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modalDisaster')">Cancel</button>
+          <button type="submit" class="btn btn-danger">Broadcast Incident</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Deploy Rescue Team -->
+  <div class="tactical-modal" id="modalDeployTeam">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Deploy Rescue Team</h3>
+        <button class="modal-close" onclick="closeModal('modalDeployTeam')">&times;</button>
+      </div>
+      <form id="formDeploy" onsubmit="handleDeployTeam(event)">
+        <div class="form-group">
+          <label>Target Disaster Event</label>
+          <select id="deployDisasterSelect" class="input-field" required></select>
+        </div>
+        <div class="form-group">
+          <label>Select Rescue Team (Standby / Active)</label>
+          <select id="deployTeamSelect" class="input-field" required></select>
+        </div>
+        <div class="form-group">
+          <label>Operational Sector</label>
+          <input type="text" id="deploySector" required placeholder="e.g. Sector 4 - Riverbank Evac Corridor" class="input-field">
+        </div>
+        <div class="form-group">
+          <label>Mission Objectives / Notes</label>
+          <textarea id="deployNotes" rows="3" placeholder="Primary objective, rescue protocol, VHF channel..." class="input-field"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modalDeployTeam')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Dispatch Battalion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Register Rescued Victim -->
+  <div class="tactical-modal" id="modalVictim">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg> Register Rescued Evacuee</h3>
+        <button class="modal-close" onclick="closeModal('modalVictim')">&times;</button>
+      </div>
+      <form id="formVictim" onsubmit="handleRegisterVictim(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="vicName" required placeholder="e.g. Ramesh Chandra Mahapatra" class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Age</label>
+            <input type="number" id="vicAge" value="38" required class="input-field">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gender</label>
+            <select id="vicGender" class="input-field">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Triage Priority</label>
+            <select id="vicTriage" class="input-field">
+              <option value="P1 - Critical">P1 - Critical (Immediate Surgery/Life Threat)</option>
+              <option value="P2 - Urgent">P2 - Urgent (Stable fractures, acute pain)</option>
+              <option value="P3 - Minor" selected>P3 - Minor (Minor abrasions, ambulatory)</option>
+              <option value="P4 - Deceased">P4 - Deceased</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Disaster Origin</label>
+            <select id="vicDisasterSelect" class="input-field" onchange="updateNearestCampRecommendation()" required></select>
+          </div>
+          <div class="form-group">
+            <label>Allocated Relief Camp (Auto Capacity Check)</label>
+            <select id="vicCampSelect" class="input-field" required></select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Medical Conditions / Triage Notes</label>
+          <input type="text" id="vicMedical" placeholder="e.g. Asthmatic, dehydration, diabetic" class="input-field">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modalVictim')">Cancel</button>
+          <button type="submit" class="btn btn-emerald">Register & Allocate Bed</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: Dispatch Relief Materials -->
+  <div class="tactical-modal" id="modalDispatch">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Dispatch Relief Supplies</h3>
+        <button class="modal-close" onclick="closeModal('modalDispatch')">&times;</button>
+      </div>
+      <form id="formDispatch" onsubmit="handleDispatchSupplies(event)">
+        <div class="form-group">
+          <label>Associated Disaster</label>
+          <select id="dispDisasterSelect" class="input-field" required></select>
+        </div>
+        <div class="form-group">
+          <label>Destination Relief Camp</label>
+          <select id="dispCampSelect" class="input-field" required></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Relief Material</label>
+            <select id="dispItemSelect" class="input-field" required>
+              <option value="ITM-001">Potable Drinking Water (20L Canisters)</option>
+              <option value="ITM-002">Ready-to-Eat Emergency Meals (Packets)</option>
+              <option value="ITM-003">Trauma First Aid Kits</option>
+              <option value="ITM-004">Heavy Thermal Blankets</option>
+              <option value="ITM-005">Water Chlorine Purification Tablets</option>
+              <option value="ITM-006">Chemical Respirator Masks</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Quantity to Dispatch</label>
+            <input type="number" id="dispQuantity" value="500" min="1" required class="input-field">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modalDispatch')">Cancel</button>
+          <button type="submit" class="btn btn-cyan">Authorize Consignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 5: Add Relief Camp -->
+  <div class="tactical-modal" id="modalCamp">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg> Add Relief Camp Shelter</h3>
+        <button class="modal-close" onclick="closeModal('modalCamp')">&times;</button>
+      </div>
+      <form id="formCamp" onsubmit="handleCreateCamp(event)">
+        <div class="form-group">
+          <label>Camp Facility Name</label>
+          <input type="text" id="cmpName" required placeholder="e.g. Cuttack Stadium Evac Shelter" class="input-field">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>In-Charge Official</label>
+            <input type="text" id="cmpOfficer" required placeholder="e.g. Deputy Collector S. Mohanty" class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Emergency Contact</label>
+            <input type="text" id="cmpPhone" value="+91-9437099881" required class="input-field">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Latitude</label>
+            <input type="number" step="0.0001" id="cmpLat" value="20.4625" required class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" step="0.0001" id="cmpLon" value="85.8830" required class="input-field">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Maximum Bed Capacity</label>
+            <input type="number" id="cmpCapacity" value="1000" min="10" required class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Medical Triage Facility?</label>
+            <select id="cmpMedical" class="input-field">
+              <option value="true">Yes (Active Trauma Unit)</option>
+              <option value="false">No (Basic Shelter)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modalCamp')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Establish Camp</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Tactical JS Controller -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
